@@ -54,6 +54,7 @@ impl RestClient {
         let username = self.config.betfair.username.clone();
         let password = self.config.betfair.password.clone();
         let pem_path = self.config.betfair.pem_path.clone();
+        let pem_bytes = self.config.betfair.pem_bytes.clone();
 
         let response = self
             .retry_policy
@@ -62,8 +63,14 @@ impl RestClient {
                 let username = username.clone();
                 let password = password.clone();
                 let pem_path = pem_path.clone();
+                let pem_bytes = pem_bytes.clone();
                 async move {
-                    let identity = load_pem_identity(&pem_path)?;
+                    let identity = if let Some(ref bytes) = pem_bytes {
+                        reqwest::Identity::from_pem(bytes)
+                            .map_err(|e| anyhow::anyhow!("Failed to parse PEM identity from bytes: {e}"))?
+                    } else {
+                        load_pem_identity(&pem_path)?
+                    };
 
                     let mut headers = HeaderMap::new();
                     headers.insert("X-Application", api_key.parse()?);
@@ -757,6 +764,7 @@ mod tests {
                 password: "test_pass".to_string(),
                 api_key: "test_key".to_string(),
                 pem_path: "/tmp/test.pem".to_string(),
+                pem_bytes: None,
             },
         }
     }

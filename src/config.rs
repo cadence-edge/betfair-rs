@@ -10,6 +10,8 @@ pub struct BetfairConfig {
     pub password: String,
     pub api_key: String,
     pub pem_path: String,
+    #[serde(default)]
+    pub pem_bytes: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
