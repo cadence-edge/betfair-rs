@@ -88,7 +88,6 @@ impl RestClient {
                     let http_response = client
                         .post(LOGIN_URL)
                         .headers(headers)
-                        .header("X-Application", format!("app_{}", rand::random::<u128>()))
                         .form(&form)
                         .send()
                         .await?;

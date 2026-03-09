@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcRequest<T> {
@@ -58,6 +58,25 @@ pub struct InteractiveLoginResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiError {
+    #[serde(deserialize_with = "deserialize_code_as_string")]
     pub code: String,
     pub message: String,
+}
+
+/// Betfair returns JSON-RPC error codes as integers per spec, but this field
+/// is typed as String for display. Accept both integer and string.
+fn deserialize_code_as_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum CodeValue {
+        Int(i64),
+        Str(String),
+    }
+    match CodeValue::deserialize(deserializer)? {
+        CodeValue::Int(n) => Ok(n.to_string()),
+        CodeValue::Str(s) => Ok(s),
+    }
 }
