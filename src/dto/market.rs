@@ -341,16 +341,21 @@ pub struct Runner {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartingPrices {
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub near_price: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub far_price: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub back_stake_taken: Option<Vec<PriceSize>>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lay_liability_taken: Option<Vec<PriceSize>>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub actual_sp: Option<Decimal>,
