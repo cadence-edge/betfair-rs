@@ -14,8 +14,23 @@ pub fn deserialize<'de, D>(deserializer: D) -> Result<Decimal, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let num = serde_json::Number::deserialize(deserializer)?;
-    Decimal::from_str(&num.to_string()).map_err(serde::de::Error::custom)
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Number(num) => {
+            Decimal::from_str(&num.to_string()).map_err(serde::de::Error::custom)
+        }
+        serde_json::Value::String(ref s)
+            if s == "NaN" || s == "Infinity" || s == "-Infinity" =>
+        {
+            Ok(Decimal::ZERO)
+        }
+        serde_json::Value::String(s) => {
+            Decimal::from_str(&s).map_err(serde::de::Error::custom)
+        }
+        _ => Err(serde::de::Error::custom(
+            "expected number or string for Decimal",
+        )),
+    }
 }
 
 pub mod option {
@@ -40,9 +55,24 @@ pub mod option {
     where
         D: Deserializer<'de>,
     {
-        let opt = Option::<serde_json::Number>::deserialize(deserializer)?;
-        opt.map(|num| Decimal::from_str(&num.to_string()).map_err(serde::de::Error::custom))
-            .transpose()
+        let value = serde_json::Value::deserialize(deserializer)?;
+        match value {
+            serde_json::Value::Null => Ok(None),
+            serde_json::Value::Number(num) => Decimal::from_str(&num.to_string())
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+            serde_json::Value::String(ref s)
+                if s == "NaN" || s == "Infinity" || s == "-Infinity" =>
+            {
+                Ok(None)
+            }
+            serde_json::Value::String(s) => Decimal::from_str(&s)
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+            _ => Err(serde::de::Error::custom(
+                "expected number, string, or null for Decimal",
+            )),
+        }
     }
 }
 
