@@ -265,7 +265,7 @@ impl App {
         let config = Config::new()?;
 
         // Initialize unified client
-        let mut client = BetfairClient::new(config);
+        let mut client = BetfairClient::new(config)?;
         self.status_message = "Logging in to Betfair API...".to_string();
 
         let login_response = client.login().await?;

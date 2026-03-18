@@ -21,13 +21,13 @@ pub struct BetfairClient {
 
 impl BetfairClient {
     /// Create a new unified client
-    pub fn new(config: Config) -> Self {
-        let api_client = RestClient::new(config.clone());
-        Self {
+    pub fn new(config: Config) -> Result<Self> {
+        let api_client = RestClient::new(config.clone())?;
+        Ok(Self {
             api_client,
             streaming_client: None,
             config,
-        }
+        })
     }
 
     /// Login to Betfair using certificate authentication and obtain session token
@@ -311,6 +311,8 @@ mod tests {
                 password: "test_pass".to_string(),
                 api_key: "test_api_key".to_string(),
                 pem_path: "/tmp/test.pem".to_string(),
+                pem_bytes: None,
+                proxy_url: None,
             },
         }
     }
@@ -318,7 +320,7 @@ mod tests {
     #[test]
     fn test_unified_client_creation() {
         let config = create_test_config();
-        let client = BetfairClient::new(config);
+        let client = BetfairClient::new(config).unwrap();
 
         assert!(client.get_session_token().is_none());
         assert!(!client.is_streaming_connected());
@@ -327,7 +329,7 @@ mod tests {
     #[test]
     fn test_get_and_set_session_token() {
         let config = create_test_config();
-        let mut client = BetfairClient::new(config);
+        let mut client = BetfairClient::new(config).unwrap();
 
         assert!(client.get_session_token().is_none());
 
@@ -338,7 +340,7 @@ mod tests {
     #[test]
     fn test_get_streaming_orderbooks() {
         let config = create_test_config();
-        let client = BetfairClient::new(config);
+        let client = BetfairClient::new(config).unwrap();
 
         let ob1 = client.get_streaming_orderbooks();
         let ob2 = client.get_streaming_orderbooks();
@@ -350,7 +352,7 @@ mod tests {
     #[test]
     fn test_get_streaming_orderbooks_empty() {
         let config = create_test_config();
-        let client = BetfairClient::new(config);
+        let client = BetfairClient::new(config).unwrap();
 
         let orderbooks = client.get_streaming_orderbooks();
         assert!(orderbooks.is_none());
@@ -359,7 +361,7 @@ mod tests {
     #[test]
     fn test_market_last_update_time_not_available() {
         let config = create_test_config();
-        let client = BetfairClient::new(config);
+        let client = BetfairClient::new(config).unwrap();
 
         let time = client.get_market_last_update_time("1.123456");
         assert!(time.is_none());
@@ -368,7 +370,7 @@ mod tests {
     #[test]
     fn test_streaming_not_connected_initially() {
         let config = create_test_config();
-        let client = BetfairClient::new(config);
+        let client = BetfairClient::new(config).unwrap();
 
         assert!(!client.is_streaming_connected());
     }
@@ -485,7 +487,7 @@ mod tests {
     #[test]
     fn test_unified_client_streaming_orderbooks_initialization() {
         let config = create_test_config();
-        let client = BetfairClient::new(config);
+        let client = BetfairClient::new(config).unwrap();
 
         let orderbooks = client.get_streaming_orderbooks();
         assert!(orderbooks.is_none());

@@ -34,16 +34,20 @@ pub struct RestClient {
 
 impl RestClient {
     /// Create a new API client
-    pub fn new(config: Config) -> Self {
-        let client = Client::new();
+    pub fn new(config: Config) -> Result<Self> {
+        let mut builder = Client::builder();
+        if let Some(ref proxy_url) = config.betfair.proxy_url {
+            builder = builder.proxy(reqwest::Proxy::all(proxy_url)?);
+        }
+        let client = builder.build()?;
 
-        Self {
+        Ok(Self {
             client,
             config: Arc::new(config),
             session_token: None,
             retry_policy: RetryPolicy::default(),
             rate_limiter: BetfairRateLimiter::new(),
-        }
+        })
     }
 
     /// Login to Betfair using certificate authentication and obtain session token
@@ -55,6 +59,7 @@ impl RestClient {
         let password = self.config.betfair.password.clone();
         let pem_path = self.config.betfair.pem_path.clone();
         let pem_bytes = self.config.betfair.pem_bytes.clone();
+        let proxy_url = self.config.betfair.proxy_url.clone();
 
         let response = self
             .retry_policy
@@ -64,6 +69,7 @@ impl RestClient {
                 let password = password.clone();
                 let pem_path = pem_path.clone();
                 let pem_bytes = pem_bytes.clone();
+                let proxy_url = proxy_url.clone();
                 async move {
                     let identity = if let Some(ref bytes) = pem_bytes {
                         reqwest::Identity::from_pem(bytes)
@@ -76,10 +82,13 @@ impl RestClient {
                     headers.insert("X-Application", api_key.parse()?);
                     headers.insert("Content-Type", "application/x-www-form-urlencoded".parse()?);
 
-                    let client = Client::builder()
+                    let mut cert_builder = Client::builder()
                         .use_rustls_tls()
-                        .identity(identity)
-                        .build()?;
+                        .identity(identity);
+                    if let Some(ref proxy_url) = proxy_url {
+                        cert_builder = cert_builder.proxy(reqwest::Proxy::all(proxy_url)?);
+                    }
+                    let client = cert_builder.build()?;
                     let form = [
                         ("username", username.as_str()),
                         ("password", password.as_str()),
@@ -655,7 +664,7 @@ impl RestClient {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let config = Config::new()?;
-    /// # let client = RestClient::new(config);
+    /// # let client = RestClient::new(config)?;
     /// // Get all events for Soccer
     /// let filter = MarketFilter {
     ///     event_type_ids: Some(vec!["1".to_string()]),
@@ -693,7 +702,7 @@ impl RestClient {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let config = Config::new()?;
-    /// # let client = RestClient::new(config);
+    /// # let client = RestClient::new(config)?;
     /// // Get all competitions for Tennis in USA
     /// let filter = MarketFilter {
     ///     event_type_ids: Some(vec!["2".to_string()]),
@@ -764,6 +773,7 @@ mod tests {
                 api_key: "test_key".to_string(),
                 pem_path: "/tmp/test.pem".to_string(),
                 pem_bytes: None,
+                proxy_url: None,
             },
         }
     }
@@ -771,7 +781,7 @@ mod tests {
     #[test]
     fn test_api_client_creation() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         assert!(client.session_token.is_none());
         assert!(client.get_session_token().is_none());
@@ -780,7 +790,7 @@ mod tests {
     #[test]
     fn test_set_and_get_session_token() {
         let config = create_test_config();
-        let mut client = RestClient::new(config);
+        let mut client = RestClient::new(config).unwrap();
 
         let token = "test_session_token".to_string();
         client.set_session_token(token.clone());
@@ -791,7 +801,7 @@ mod tests {
     #[test]
     fn test_client_has_session_token_field() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         assert!(client.session_token.is_none());
     }
@@ -799,7 +809,7 @@ mod tests {
     #[test]
     fn test_client_has_api_key_in_config() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         assert_eq!(client.config.betfair.api_key, "test_key");
     }
@@ -807,7 +817,7 @@ mod tests {
     #[test]
     fn test_extract_session_token_from_session_token_field() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: Some("test_session_token".to_string()),
@@ -826,7 +836,7 @@ mod tests {
     #[test]
     fn test_extract_session_token_from_token_field() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: None,
@@ -845,7 +855,7 @@ mod tests {
     #[test]
     fn test_extract_session_token_prefers_session_token_over_token() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: Some("session_token_value".to_string()),
@@ -864,7 +874,7 @@ mod tests {
     #[test]
     fn test_extract_session_token_empty_when_no_tokens() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: None,
@@ -883,7 +893,7 @@ mod tests {
     #[test]
     fn test_get_login_status_from_login_status_field() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: Some("token".to_string()),
@@ -902,7 +912,7 @@ mod tests {
     #[test]
     fn test_get_login_status_falls_back_to_status() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: Some("token".to_string()),
@@ -921,7 +931,7 @@ mod tests {
     #[test]
     fn test_get_login_status_falls_back_to_status_code() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: Some("token".to_string()),
@@ -940,7 +950,7 @@ mod tests {
     #[test]
     fn test_get_error_message_from_error_field() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: Some("token".to_string()),
@@ -959,7 +969,7 @@ mod tests {
     #[test]
     fn test_get_error_message_falls_back_to_error_details() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: Some("token".to_string()),
@@ -978,7 +988,7 @@ mod tests {
     #[test]
     fn test_get_error_message_default_when_no_error_fields() {
         let config = create_test_config();
-        let client = RestClient::new(config);
+        let client = RestClient::new(config).unwrap();
 
         let response = InteractiveLoginResponse {
             session_token: Some("token".to_string()),

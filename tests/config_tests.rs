@@ -108,6 +108,8 @@ fn test_betfair_config_clone() {
         password: "pass".to_string(),
         api_key: "key".to_string(),
         pem_path: "/path".to_string(),
+        pem_bytes: None,
+        proxy_url: None,
     };
 
     let cloned = config.clone();
@@ -124,6 +126,8 @@ fn test_config_clone() {
         password: "pass".to_string(),
         api_key: "key".to_string(),
         pem_path: "/path".to_string(),
+        pem_bytes: None,
+        proxy_url: None,
     };
 
     let config = Config {

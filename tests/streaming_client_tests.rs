@@ -10,6 +10,8 @@ fn create_test_config() -> Config {
             password: "test_pass".to_string(),
             api_key: "test_api_key".to_string(),
             pem_path: "test.pem".to_string(),
+            pem_bytes: None,
+            proxy_url: None,
         },
     }
 }

@@ -12,6 +12,8 @@ pub struct BetfairConfig {
     pub pem_path: String,
     #[serde(default)]
     pub pem_bytes: Option<Vec<u8>>,
+    #[serde(default)]
+    pub proxy_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

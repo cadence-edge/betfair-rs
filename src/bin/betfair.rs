@@ -67,7 +67,7 @@ mod streaming {
         tracing_subscriber::fmt::init();
 
         let config = Config::new()?;
-        let mut api_client = BetfairClient::new(config.clone());
+        let mut api_client = BetfairClient::new(config.clone())?;
 
         info!("Logging in to Betfair...");
         api_client.login().await?;

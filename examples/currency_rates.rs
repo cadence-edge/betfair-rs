@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
     let config = Config::new()?;
 
     // Initialize unified client
-    let mut client = BetfairClient::new(config);
+    let mut client = BetfairClient::new(config)?;
 
     info!("Logging in to Betfair API...");
 

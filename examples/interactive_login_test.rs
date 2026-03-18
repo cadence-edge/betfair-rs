@@ -23,11 +23,13 @@ async fn main() -> Result<()> {
             password: String::new(), // Not used for interactive login
             api_key,
             pem_path: String::new(), // Not used for interactive login
+            pem_bytes: None,
+            proxy_url: None,
         },
     };
 
     // Initialize unified client
-    let mut client = BetfairClient::new(config);
+    let mut client = BetfairClient::new(config)?;
 
     info!("Attempting interactive login...");
 

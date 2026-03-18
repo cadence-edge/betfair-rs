@@ -15,7 +15,7 @@
 //! let config = Config::new()?;
 //!
 //! // Create API client and login
-//! let mut client = BetfairClient::new(config);
+//! let mut client = BetfairClient::new(config)?;
 //! client.login().await?;
 //!
 //! // List available sports (event types)
@@ -67,7 +67,7 @@
 //!
 //! # async fn example() -> anyhow::Result<()> {
 //! let config = Config::new()?;
-//! let mut api_client = BetfairClient::new(config.clone());
+//! let mut api_client = BetfairClient::new(config.clone())?;
 //! api_client.login().await?;
 //!
 //! let session_token = api_client.get_session_token()
