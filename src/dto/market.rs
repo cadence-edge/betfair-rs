@@ -138,7 +138,8 @@ pub struct RunnerCatalog {
     pub runner_name: String,
     #[serde(with = "super::decimal_serde")]
     pub handicap: Decimal,
-    pub sort_priority: i32,
+    #[serde(default)]
+    pub sort_priority: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, String>>,
 }
