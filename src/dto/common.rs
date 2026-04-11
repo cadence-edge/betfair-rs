@@ -189,6 +189,7 @@ pub enum InstructionReportErrorCode {
 pub enum BetOutcome {
     Won,
     Lost,
+    Placed,
     Void,
 }
 
