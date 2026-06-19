@@ -362,6 +362,17 @@ impl RestClient {
             .await
     }
 
+    /// Replace orders — atomically cancel the unmatched remainder of each bet
+    /// and re-place it at a new price (size and persistence type preserved).
+    pub async fn replace_orders(
+        &self,
+        request: ReplaceOrdersRequest,
+    ) -> Result<ReplaceOrdersResponse> {
+        self.rate_limiter.acquire_for_transaction().await?;
+        self.make_json_rpc_request(BETTING_URL, "SportsAPING/v1.0/replaceOrders", request)
+            .await
+    }
+
     /// List current orders
     pub async fn list_current_orders(
         &self,
@@ -491,6 +502,23 @@ impl RestClient {
         };
 
         self.cancel_orders(request).await
+    }
+
+    /// Replace a single bet's price by ID (atomic cancel-and-replace of the
+    /// unmatched remainder).
+    pub async fn replace_bet(
+        &self,
+        market_id: String,
+        bet_id: String,
+        new_price: Decimal,
+    ) -> Result<ReplaceOrdersResponse> {
+        let request = ReplaceOrdersRequest {
+            market_id,
+            instructions: vec![ReplaceInstruction { bet_id, new_price }],
+            customer_ref: None,
+        };
+
+        self.replace_orders(request).await
     }
 
     /// Get orders by bet IDs

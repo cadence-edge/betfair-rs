@@ -151,6 +151,14 @@ impl BetfairClient {
         self.api_client.cancel_orders(request).await
     }
 
+    /// Replace orders — atomic cancel-and-replace of unmatched remainders at new prices.
+    pub async fn replace_orders(
+        &self,
+        request: ReplaceOrdersRequest,
+    ) -> Result<ReplaceOrdersResponse> {
+        self.api_client.replace_orders(request).await
+    }
+
     /// List current orders
     pub async fn list_current_orders(
         &self,

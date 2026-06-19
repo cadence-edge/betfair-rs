@@ -216,6 +216,52 @@ pub struct CancelInstructionReport {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ReplaceOrdersRequest {
+    pub market_id: String,
+    pub instructions: Vec<ReplaceInstruction>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub customer_ref: Option<String>,
+}
+
+/// Atomically cancel the unmatched remainder of `bet_id` and re-place it at
+/// `new_price`, preserving the original order's size and persistence type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplaceInstruction {
+    pub bet_id: String,
+    #[serde(with = "super::decimal_serde")]
+    pub new_price: Decimal,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplaceOrdersResponse {
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    pub market_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instruction_reports: Option<Vec<ReplaceInstructionReport>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub customer_ref: Option<String>,
+}
+
+/// Report for one replace instruction: the cancellation of the old order plus
+/// the placement of the replacement (whose `bet_id` is the new resting order).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplaceInstructionReport {
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cancel_instruction_report: Option<CancelInstructionReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub place_instruction_report: Option<PlaceInstructionReport>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ListCurrentOrdersRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bet_ids: Option<Vec<String>>,
@@ -442,4 +488,58 @@ pub struct ItemDescription {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub each_way_divisor: Option<Decimal>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn replace_orders_request_serializes_to_betfair_wire_shape() {
+        let req = ReplaceOrdersRequest {
+            market_id: "1.234".to_string(),
+            instructions: vec![ReplaceInstruction {
+                bet_id: "404282827660".to_string(),
+                new_price: dec!(6.4),
+            }],
+            customer_ref: None,
+        };
+        let v = serde_json::to_value(&req).unwrap();
+        assert_eq!(v["marketId"], "1.234");
+        assert_eq!(v["instructions"][0]["betId"], "404282827660");
+        assert_eq!(v["instructions"][0]["newPrice"], 6.4);
+        // customer_ref is None → omitted
+        assert!(v.get("customerRef").is_none());
+    }
+
+    #[test]
+    fn replace_orders_response_deserializes_nested_reports() {
+        let json = r#"{
+            "status": "SUCCESS",
+            "marketId": "1.234",
+            "instructionReports": [{
+                "status": "SUCCESS",
+                "cancelInstructionReport": { "status": "SUCCESS", "instruction": { "betId": "old1" }, "sizeCancelled": 5.0 },
+                "placeInstructionReport": {
+                    "status": "SUCCESS",
+                    "instruction": { "orderType": "LIMIT", "selectionId": 1, "side": "LAY", "limitOrder": { "size": 5.0, "price": 6.4, "persistenceType": "MARKET_ON_CLOSE" } },
+                    "betId": "new1",
+                    "sizeMatched": 0.0
+                }
+            }]
+        }"#;
+        let resp: ReplaceOrdersResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.status, "SUCCESS");
+        let report = &resp.instruction_reports.unwrap()[0];
+        assert_eq!(report.status, "SUCCESS");
+        assert_eq!(
+            report.place_instruction_report.as_ref().unwrap().bet_id.as_deref(),
+            Some("new1")
+        );
+        assert_eq!(
+            report.cancel_instruction_report.as_ref().unwrap().size_cancelled,
+            Some(dec!(5.0))
+        );
+    }
 }
