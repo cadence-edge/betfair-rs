@@ -221,6 +221,7 @@ pub struct ExBestOffersOverrides {
     pub rollup_model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rollup_limit: Option<i32>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub rollup_liability_threshold: Option<Decimal>,
@@ -388,21 +389,27 @@ pub struct MarketOrder {
     #[serde(with = "super::decimal_serde")]
     pub bsp_liability: Decimal,
     pub placed_date: String,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub avg_price_matched: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_matched: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_remaining: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_lapsed: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_cancelled: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_voided: Option<Decimal>,

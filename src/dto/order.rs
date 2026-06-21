@@ -42,18 +42,25 @@ pub struct OrderStatusResponse {
     pub order_status: String,
     pub placed_date: Option<String>,
     pub matched_date: Option<String>,
+    #[serde(default)]
     #[serde(with = "super::decimal_serde::option")]
     pub average_price_matched: Option<Decimal>,
+    #[serde(default)]
     #[serde(with = "super::decimal_serde::option")]
     pub size_matched: Option<Decimal>,
+    #[serde(default)]
     #[serde(with = "super::decimal_serde::option")]
     pub size_remaining: Option<Decimal>,
+    #[serde(default)]
     #[serde(with = "super::decimal_serde::option")]
     pub size_lapsed: Option<Decimal>,
+    #[serde(default)]
     #[serde(with = "super::decimal_serde::option")]
     pub size_cancelled: Option<Decimal>,
+    #[serde(default)]
     #[serde(with = "super::decimal_serde::option")]
     pub size_voided: Option<Decimal>,
+    #[serde(default)]
     #[serde(with = "super::decimal_serde::option")]
     pub profit: Option<Decimal>,
 }
@@ -207,6 +214,7 @@ pub struct CancelInstructionReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<String>,
     pub instruction: CancelInstruction,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_cancelled: Option<Decimal>,
@@ -298,10 +306,12 @@ pub struct CurrentOrderSummary {
     pub bet_id: String,
     pub market_id: String,
     pub selection_id: i64,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub handicap: Option<Decimal>,
     pub price_size: PriceSize,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub bsp_liability: Option<Decimal>,
@@ -313,21 +323,27 @@ pub struct CurrentOrderSummary {
     pub placed_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub matched_date: Option<String>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub average_price_matched: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_matched: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_remaining: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_lapsed: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_cancelled: Option<Decimal>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub size_voided: Option<Decimal>,
@@ -540,6 +556,42 @@ mod tests {
         assert_eq!(
             report.cancel_instruction_report.as_ref().unwrap().size_cancelled,
             Some(dec!(5.0))
+        );
+    }
+
+    /// Regression: Betfair may omit `sizeCancelled` from the nested
+    /// cancelInstructionReport of a replaceOrders response. Without
+    /// `#[serde(default)]` on `size_cancelled`, serde threw
+    /// `missing field 'sizeCancelled'`, turning an executed replace into a
+    /// recorded failure (prod incident). It must deserialize to `None`.
+    #[test]
+    fn replace_orders_response_tolerates_missing_size_cancelled() {
+        let json = r#"{
+            "status": "SUCCESS",
+            "marketId": "1.234",
+            "instructionReports": [{
+                "status": "SUCCESS",
+                "cancelInstructionReport": { "status": "SUCCESS", "instruction": { "betId": "old1" } },
+                "placeInstructionReport": {
+                    "status": "SUCCESS",
+                    "instruction": { "orderType": "LIMIT", "selectionId": 1, "side": "LAY", "limitOrder": { "size": 5.0, "price": 6.4, "persistenceType": "MARKET_ON_CLOSE" } },
+                    "betId": "new1"
+                }
+            }]
+        }"#;
+        let resp: ReplaceOrdersResponse = serde_json::from_str(json).unwrap();
+        let report = &resp.instruction_reports.unwrap()[0];
+        let cancel = report.cancel_instruction_report.as_ref().unwrap();
+        assert_eq!(cancel.size_cancelled, None);
+        assert_eq!(cancel.status, "SUCCESS");
+        // placeInstructionReport also omits sizeMatched — must default to None too.
+        assert_eq!(
+            report.place_instruction_report.as_ref().unwrap().bet_id.as_deref(),
+            Some("new1")
+        );
+        assert_eq!(
+            report.place_instruction_report.as_ref().unwrap().size_matched,
+            None
         );
     }
 }

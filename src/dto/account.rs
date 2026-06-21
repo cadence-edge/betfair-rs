@@ -45,6 +45,7 @@ pub struct GetAccountFundsResponse {
     pub retained_commission: Decimal,
     #[serde(with = "super::decimal_serde")]
     pub exposure_limit: Decimal,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub discount_rate: Option<Decimal>,
@@ -72,6 +73,7 @@ pub struct GetAccountDetailsResponse {
     pub region: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
     pub discount_rate: Option<Decimal>,
