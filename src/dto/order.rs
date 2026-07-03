@@ -159,7 +159,14 @@ pub struct PlaceInstructionReport {
     pub error_code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_status: Option<OrderStatus>,
-    pub instruction: PlaceInstruction,
+    // Optional: a placeOrders response echoes the original `instruction`, but a
+    // replaceOrders response's nested placeInstructionReport OMITS it (the
+    // original instruction was a ReplaceInstruction, not a PlaceInstruction).
+    // Without `default`, serde threw `missing field 'instruction'`, turning an
+    // executed replace into a recorded failure (prod incident). We never read it.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instruction: Option<PlaceInstruction>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bet_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -213,7 +220,11 @@ pub struct CancelInstructionReport {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<String>,
-    pub instruction: CancelInstruction,
+    // Optional for the same reason as PlaceInstructionReport.instruction: a
+    // replaceOrders response's nested cancelInstructionReport omits `instruction`.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instruction: Option<CancelInstruction>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "super::decimal_serde::option")]
@@ -592,6 +603,66 @@ mod tests {
         assert_eq!(
             report.place_instruction_report.as_ref().unwrap().size_matched,
             None
+        );
+    }
+
+    /// Regression: a replaceOrders response's nested cancel/place instruction
+    /// reports OMIT the `instruction` field (the original instruction was a
+    /// ReplaceInstruction, not a Place/Cancel instruction). Without
+    /// `#[serde(default)]` on `instruction`, serde threw
+    /// `missing field 'instruction'`, turning an executed (possibly
+    /// partially-executed) replace into a recorded failure — masking the case
+    /// where the cancel succeeded but the re-place failed (prod incident). Both
+    /// nested `instruction` fields must deserialize to `None`.
+    #[test]
+    fn replace_orders_response_tolerates_missing_instruction() {
+        // Full success, `instruction` omitted in both nested reports.
+        let json = r#"{
+            "status": "SUCCESS",
+            "marketId": "1.234",
+            "instructionReports": [{
+                "status": "SUCCESS",
+                "cancelInstructionReport": { "status": "SUCCESS", "sizeCancelled": 5.0 },
+                "placeInstructionReport": { "status": "SUCCESS", "betId": "new1", "sizeMatched": 0.0 }
+            }]
+        }"#;
+        let resp: ReplaceOrdersResponse = serde_json::from_str(json).unwrap();
+        let report = &resp.instruction_reports.unwrap()[0];
+        let cancel = report.cancel_instruction_report.as_ref().unwrap();
+        assert!(cancel.instruction.is_none());
+        assert_eq!(cancel.size_cancelled, Some(dec!(5.0)));
+        let place = report.place_instruction_report.as_ref().unwrap();
+        assert!(place.instruction.is_none());
+        assert_eq!(place.bet_id.as_deref(), Some("new1"));
+
+        // Partial execution: cancel SUCCESS, place FAILURE (INSUFFICIENT_FUNDS),
+        // `instruction` omitted throughout. Must still parse so the caller can
+        // detect the remainder was cancelled but not re-placed.
+        let partial = r#"{
+            "status": "FAILURE",
+            "errorCode": "PROCESSED_WITH_ERRORS",
+            "marketId": "1.234",
+            "instructionReports": [{
+                "status": "FAILURE",
+                "errorCode": "INSUFFICIENT_FUNDS",
+                "cancelInstructionReport": { "status": "SUCCESS", "sizeCancelled": 17.0 },
+                "placeInstructionReport": { "status": "FAILURE", "errorCode": "INSUFFICIENT_FUNDS" }
+            }]
+        }"#;
+        let resp: ReplaceOrdersResponse = serde_json::from_str(partial).unwrap();
+        let report = &resp.instruction_reports.unwrap()[0];
+        assert_eq!(report.status, "FAILURE");
+        assert_eq!(
+            report.cancel_instruction_report.as_ref().unwrap().status,
+            "SUCCESS"
+        );
+        assert_eq!(
+            report.cancel_instruction_report.as_ref().unwrap().size_cancelled,
+            Some(dec!(17.0))
+        );
+        assert_eq!(
+            report.place_instruction_report.as_ref().unwrap().status,
+            "FAILURE"
         );
     }
 }
