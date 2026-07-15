@@ -15,6 +15,22 @@ categories = ["api-bindings", "web-programming", "asynchronous"]
 [[bin]]
 name = "betfair"
 path = "src/bin/betfair.rs"
+# The binary (and the dashboard example it include!s) is the only consumer of
+# clap/ratatui/crossterm; library-only consumers build without them via
+# `default-features = false`.
+required-features = ["cli"]
+
+# Only the dashboard example uses the TUI stack; gate it so
+# `--no-default-features` builds (and `cargo test`) don't try to compile it.
+[[example]]
+name = "dashboard"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+# Command-line/terminal binary support. Off for library consumers (e.g.
+# cadence-daemon) so they don't pull clap/ratatui/crossterm.
+cli = ["dep:clap", "dep:ratatui", "dep:crossterm"]
 
 [dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros"] }
@@ -33,9 +49,9 @@ serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 anyhow = "1.0"
 dotenv = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
-clap = { version = "4.5", features = ["derive"] }
-ratatui = "0.28"
-crossterm = "0.28"
+clap = { version = "4.5", features = ["derive"], optional = true }
+ratatui = { version = "0.28", optional = true }
+crossterm = { version = "0.28", optional = true }
 rust_decimal = { version = "1.36", features = ["serde-float"] }
 
 [dev-dependencies]
